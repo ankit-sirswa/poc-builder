@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f3ef">
+  <title>draftwork — Upwork brief to clickable prototype</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f4f3ef;
+      --panel: #fffefa;
+      --ink: #20231f;
+      --muted: #777a72;
+      --line: #e6e5de;
+      --orange: #e66d45;
+      --orange-dark: #c44e2a;
+      --green: #718b70;
+      --green-wash: #eaf0e7;
+      --serif: "Iowan Old Style", "Baskerville", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      --sans: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      margin: 0;
+      color: var(--ink);
+      background-color: var(--paper);
+      background-image: radial-gradient(#d9d8d0 0.7px, transparent 0.7px);
+      background-size: 17px 17px;
+      font-family: var(--sans);
+      font-size: 14px;
+    }
+
+    button, input, textarea { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #e66d4580; outline-offset: 2px; }
+
+    .shell { width: min(1480px, calc(100% - 64px)); margin: 0 auto; }
+    .topbar { height: 70px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #deddd6; }
+    .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-size: 16px; font-weight: 750; letter-spacing: -.5px; }
+    .brand-mark { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 8px 8px 8px 2px; color: white; background: var(--orange); font-family: var(--serif); font-size: 19px; font-weight: 700; }
+    .topbar-right { display: flex; align-items: center; gap: 18px; }
+    .workspace-label { display: flex; align-items: center; gap: 8px; color: #62665e; font-size: 12px; }
+    .workspace-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+    .avatar { display: grid; width: 31px; height: 31px; place-items: center; border: 1px solid #d9d8d1; border-radius: 50%; background: #e9ded1; font-family: var(--serif); font-size: 13px; }
+
+    .intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding: 32px 0 26px; }
+    .eyebrow { margin: 0 0 9px; color: var(--orange-dark); font-family: var(--mono); font-size: 10px; letter-spacing: 1.1px; text-transform: uppercase; }
+    h1 { max-width: 720px; margin: 0; font-family: var(--serif); font-size: clamp(29px, 3vw, 42px); font-weight: 500; line-height: 1.08; letter-spacing: 0; }
+    .intro-note { max-width: 280px; margin: 0 0 3px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+    .workspace { display: grid; grid-template-columns: 344px minmax(0, 1fr); gap: 17px; align-items: stretch; }
+    .brief-panel, .stage-panel { border: 1px solid #e4e2db; border-radius: 7px; background: var(--panel); box-shadow: 0 6px 24px #302e2410; }
+    .brief-panel { display: flex; flex-direction: column; padding: 19px 19px 16px; }
+    .panel-kicker { display: flex; align-items: center; justify-content: space-between; margin-bottom: 17px; }
+    .section-label { color: #777a72; font-family: var(--mono); font-size: 10px; letter-spacing: .8px; }
+    .step-number { display: inline-grid; width: 21px; height: 21px; margin-right: 7px; place-items: center; border: 1px solid #e4b8a8; border-radius: 50%; color: var(--orange-dark); font-family: var(--mono); font-size: 10px; }
+    .text-button { padding: 0; border: 0; color: var(--orange-dark); background: transparent; cursor: pointer; font-size: 11px; }
+    .field-label { display: block; margin: 0 0 7px; color: #555950; font-size: 11px; font-weight: 650; }
+    .text-input, .brief-input { width: 100%; border: 1px solid #e3e2dc; border-radius: 4px; color: var(--ink); background: #fff; font-size: 12px; }
+    .text-input { height: 37px; margin-bottom: 14px; padding: 0 10px; }
+    .credential-row { display: flex; gap: 6px; margin-bottom: 12px; }
+    .credential-input { flex: 1; min-width: 0; height: 37px; margin: 0; padding: 0 10px; font-family: var(--mono); font-size: 10px; }
+    .model-select { width: 100%; height: 37px; margin-bottom: 7px; padding: 0 10px; border: 1px solid #e3e2dc; border-radius: 4px; color: var(--ink); background: #fff; font-size: 11px; }
+    .key-demo-note { margin: 0 0 13px; color: #898b84; font-size: 9px; line-height: 1.5; }
+    .field-error { display: none; margin: -4px 0 10px; color: #b3452d; font-size: 10px; }
+    .field-error.is-visible { display: block; }
+    .brief-input { min-height: 184px; resize: vertical; padding: 10px; line-height: 1.55; }
+    .field-hint { display: flex; justify-content: space-between; margin: 6px 0 14px; color: #93958e; font-size: 10px; }
+    .meta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .meta-box { padding: 9px 10px; border: 1px solid #ebe9e3; border-radius: 4px; background: #fbfaf7; }
+    .meta-box span { display: block; margin-bottom: 5px; color: #92948d; font-family: var(--mono); font-size: 9px; text-transform: uppercase; }
+    .meta-box strong { font-size: 11px; font-weight: 600; }
+    .divider { height: 1px; margin: 16px 0 13px; background: var(--line); }
+    .output-list { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+    .output-list li { display: flex; align-items: center; gap: 8px; color: #51554d; font-size: 11px; }
+    .check { display: grid; width: 16px; height: 16px; place-items: center; border-radius: 50%; color: #527250; background: var(--green-wash); font-size: 10px; }
+    .build-button { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; min-height: 43px; margin-top: auto; padding: 10px; border: 0; border-radius: 4px; color: #fff; background: var(--ink); cursor: pointer; font-size: 12px; font-weight: 650; transition: background .2s, transform .2s; }
+    .build-button:hover { transform: translateY(-1px); background: #363b34; }
+    .build-button svg, .deploy-button svg { width: 15px; height: 15px; }
+
+    .stage-panel { min-width: 0; overflow: hidden; }
+    .stage-toolbar { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 17px; border-bottom: 1px solid #e9e7e1; }
+    .project-heading { min-width: 0; }
+    .project-title { overflow: hidden; margin: 0 0 4px; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+    .project-subtitle { color: #898b84; font-size: 10px; }
+    .toolbar-actions { display: flex; align-items: center; gap: 10px; }
+    .saved-state { display: flex; align-items: center; gap: 5px; color: #777a72; font-size: 10px; white-space: nowrap; }
+    .saved-state::before { width: 6px; height: 6px; border-radius: 50%; background: #7a9a75; content: ""; }
+    .deploy-button { display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 12px; border: 0; border-radius: 4px; color: white; background: var(--orange); cursor: pointer; font-size: 11px; font-weight: 650; transition: background .2s; }
+    .deploy-button:hover { background: var(--orange-dark); }
+    .view-tabs { display: flex; gap: 20px; padding: 0 18px; border-bottom: 1px solid #eeece7; }
+    .tab { position: relative; padding: 12px 0 11px; border: 0; color: #878981; background: transparent; cursor: pointer; font-size: 10px; }
+    .tab[aria-selected="true"] { color: var(--ink); font-weight: 700; }
+    .tab[aria-selected="true"]::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: var(--orange); content: ""; }
+    .preview-area { padding: 16px; background: #f1f0eb; }
+    .browser-frame { overflow: hidden; min-height: 420px; border: 1px solid #dfded7; border-radius: 5px; background: #fbfaf6; box-shadow: 0 4px 14px #29291d0c; }
+    .browser-bar { height: 30px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 10px; border-bottom: 1px solid #eceae4; background: #fffefa; }
+    .traffic-lights { display: flex; gap: 4px; }
+    .traffic-lights i { width: 6px; height: 6px; border-radius: 50%; background: #e5a094; }
+    .traffic-lights i:nth-child(2) { background: #e8ca80; }
+    .traffic-lights i:nth-child(3) { background: #a8c59b; }
+    .address { padding: 4px 30px; border-radius: 3px; color: #8d8e88; background: #f4f3ef; font-family: var(--mono); font-size: 8px; }
+    .browser-side { justify-self: end; color: #aaa99f; font-size: 9px; }
+    .mock-site { min-height: 389px; padding: 0 7.2%; background: #f9f8f2; }
+    .site-nav { height: 55px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e6e4dc; }
+    .site-brand { color: #2c382d; font-family: var(--serif); font-size: 16px; font-weight: 700; }
+    .site-brand span { color: var(--orange); }
+    .site-links { display: flex; align-items: center; gap: 22px; color: #6f746b; font-size: 9px; }
+    .site-links a { color: inherit; text-decoration: none; }
+    .site-links a:hover { color: var(--orange-dark); }
+    .site-contact { padding: 7px 10px; border: 1px solid #abb4a6; border-radius: 3px; color: #465343 !important; }
+    .site-links a[aria-current="page"] { color: var(--orange-dark); }
+    .site-page-content { min-height: 326px; }
+    .route-heading { max-width: 560px; margin: 0 0 11px; color: #2c382d; font-family: var(--serif); font-size: clamp(28px, 3.2vw, 42px); font-weight: 500; line-height: 1.06; }
+    .route-copy { max-width: 460px; margin: 0; color: #777c72; font-size: 10px; line-height: 1.7; }
+    .route-top { padding: 35px 0 20px; }
+    .project-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; padding-bottom: 30px; }
+    .project-card { overflow: hidden; border: 1px solid #e5e4db; border-radius: 3px; background: #fffefa; }
+    .project-card img { display: block; width: 100%; aspect-ratio: 1.28; object-fit: cover; background: #e8e8d8; }
+    .project-card div { padding: 9px; }
+    .project-card strong, .project-card span { display: block; }
+    .project-card strong { color: #374238; font-family: var(--serif); font-size: 13px; font-weight: 600; }
+    .project-card span { margin-top: 4px; color: #85897f; font-size: 8px; }
+    .studio-layout { display: grid; grid-template-columns: 1fr .7fr; gap: 7%; align-items: center; padding: 34px 0; }
+    .studio-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .studio-fact { padding: 12px; border: 1px solid #e1e3d8; background: #f0f0e6; }
+    .studio-fact strong { display: block; color: #374838; font-family: var(--serif); font-size: 19px; font-weight: 500; }
+    .studio-fact span { color: #7e8378; font-size: 8px; }
+    .contact-layout { display: grid; grid-template-columns: 1fr .85fr; gap: 8%; padding: 35px 0; }
+    .contact-form { display: grid; gap: 8px; }
+    .contact-form input, .contact-form textarea { width: 100%; padding: 9px; border: 1px solid #e2e2d9; border-radius: 2px; color: #374238; background: #fffefa; font: inherit; font-size: 9px; }
+    .contact-form textarea { min-height: 72px; resize: vertical; }
+    .contact-form button { justify-self: start; padding: 9px 11px; border: 0; border-radius: 2px; color: #fff; background: #374838; cursor: pointer; font-size: 9px; }
+    .contact-details { padding: 15px; background: #eff0e7; }
+    .contact-details span, .contact-details strong { display: block; }
+    .contact-details span { margin: 0 0 5px; color: #82877c; font-family: var(--mono); font-size: 8px; text-transform: uppercase; }
+    .contact-details strong { margin-bottom: 15px; color: #374838; font-family: var(--serif); font-size: 15px; font-weight: 500; }
+    .page-row { width: 100%; border: 0; text-align: left; background: transparent; cursor: pointer; font-family: inherit; }
+    .page-row:hover { background: #f6f5f0; }
+    .hero-grid { display: grid; grid-template-columns: 1fr .78fr; gap: 6%; align-items: center; min-height: 326px; padding: 36px 0 40px; }
+    .site-eyebrow { display: flex; align-items: center; gap: 7px; margin: 0 0 15px; color: #7b8b72; font-family: var(--mono); font-size: 8px; letter-spacing: .8px; text-transform: uppercase; }
+    .site-eyebrow::before { width: 15px; height: 1px; background: var(--orange); content: ""; }
+    .site-title { max-width: 380px; margin: 0 0 13px; color: #2c382d; font-family: var(--serif); font-size: clamp(31px, 3.5vw, 48px); font-weight: 500; line-height: .99; letter-spacing: 0; }
+    .site-description { max-width: 285px; margin: 0; color: #777c72; font-size: 10px; line-height: 1.7; }
+    .site-cta { display: inline-flex; align-items: center; gap: 11px; margin-top: 23px; padding: 10px 12px; border: 0; border-radius: 3px; color: white; background: #374838; cursor: pointer; font-size: 9px; }
+    .site-cta span { color: #d4a17e; font-size: 14px; }
+    .artwork { position: relative; width: 100%; aspect-ratio: 1.02; overflow: hidden; border-radius: 48% 48% 3px 3px; background: #e8e8d8; }
+    .art-image { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .artwork::before { position: absolute; right: -9%; bottom: -24%; left: -5%; height: 71%; border: 1px solid #73836b; border-radius: 50% 50% 0 0; background: repeating-linear-gradient(0deg, transparent 0 16px, #85927b 17px, transparent 18px); content: ""; transform: rotate(-12deg); }
+    .artwork::after { position: absolute; top: 5%; left: 17%; width: 63%; height: 91%; border: 1px solid #99a18a; border-radius: 50%; background: repeating-linear-gradient(90deg, transparent 0 21px, #9fa692 22px, transparent 23px); content: ""; transform: rotate(22deg); }
+    .art-sun { position: absolute; top: 15%; right: 15%; width: 24%; aspect-ratio: 1; border-radius: 50%; background: #db8d67; }
+    .art-caption { position: absolute; z-index: 1; right: 9px; bottom: 10px; padding: 5px 7px; color: #4f5d4a; background: #f9f8f2dc; font-family: var(--mono); font-size: 7px; }
+    .site-foot { display: flex; justify-content: space-between; padding: 10px 0 13px; border-top: 1px solid #e6e4dc; color: #8c8f84; font-family: var(--mono); font-size: 8px; }
+
+    .alternate-view { display: none; min-height: 420px; padding: 24px; background: #fbfaf6; }
+    .alternate-view.is-visible { display: block; }
+    .page-list { max-width: 560px; }
+    .page-row { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid #e9e7e0; }
+    .page-row strong { display: block; margin-bottom: 4px; font-size: 12px; }
+    .page-row span { color: #8b8d85; font-size: 10px; }
+    .page-status { padding: 5px 7px; border-radius: 3px; color: #527250; background: var(--green-wash); font-family: var(--mono); font-size: 8px; }
+    .data-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; max-width: 620px; }
+    .data-item { padding: 13px; border: 1px solid #e9e7e0; border-radius: 4px; }
+    .data-item span { display: block; margin-bottom: 8px; color: #92948c; font-family: var(--mono); font-size: 9px; text-transform: uppercase; }
+    .data-item strong { font-size: 12px; font-weight: 600; }
+
+    .under-stage { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 17px; color: #8b8d85; font-size: 10px; }
+    .screen-size { display: flex; align-items: center; gap: 6px; color: #777a72; }
+    .screen-size svg { width: 13px; height: 13px; }
+    .toast { position: fixed; z-index: 5; right: 24px; bottom: 24px; max-width: min(370px, calc(100vw - 32px)); padding: 12px 15px; border: 1px solid #d9ddd2; border-radius: 5px; color: #344431; background: #f8fbf5; box-shadow: 0 8px 26px #1e241a1c; font-size: 12px; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .2s, transform .2s; }
+    .toast.is-visible { opacity: 1; transform: translateY(0); }
+
+    .modal-backdrop { position: fixed; z-index: 10; inset: 0; display: none; align-items: center; justify-content: center; padding: 18px; background: #20231f8c; }
+    .modal-backdrop.is-open { display: flex; }
+    .deploy-modal { width: min(450px, 100%); padding: 23px; border: 1px solid #e6e3da; border-radius: 6px; background: var(--panel); box-shadow: 0 18px 70px #0003; animation: arrive .2s ease-out; }
+    @keyframes arrive { from { opacity: 0; transform: translateY(8px) scale(.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .modal-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+    .modal-icon { display: grid; width: 37px; height: 37px; place-items: center; border-radius: 5px; color: #fff; background: #20231f; }
+    .modal-icon svg { width: 18px; height: 18px; }
+    .close-button { width: 30px; height: 30px; border: 1px solid #e8e6df; border-radius: 4px; color: #73766e; background: transparent; cursor: pointer; font-size: 17px; }
+    .modal-title { margin: 17px 0 6px; font-family: var(--serif); font-size: 25px; font-weight: 500; }
+    .modal-copy { margin: 0 0 18px; color: #74776f; font-size: 11px; line-height: 1.6; }
+    .demo-notice { display: flex; gap: 8px; margin: 0 0 17px; padding: 10px; border: 1px solid #eddec1; border-radius: 4px; color: #745b32; background: #faf4e7; font-size: 10px; line-height: 1.5; }
+    .notice-mark { flex: 0 0 auto; font-family: var(--mono); font-weight: 700; }
+    .key-wrap { display: flex; gap: 6px; }
+    .key-input { flex: 1; min-width: 0; height: 39px; padding: 0 10px; border: 1px solid #e3e2dc; border-radius: 4px; color: var(--ink); background: white; font-family: var(--mono); font-size: 10px; }
+    .reveal-button { width: 42px; border: 1px solid #e3e2dc; border-radius: 4px; color: #666960; background: white; cursor: pointer; font-size: 10px; }
+    .security-note { margin: 7px 0 16px; color: #999b94; font-size: 9px; line-height: 1.5; }
+    .deploy-submit { width: 100%; min-height: 40px; border: 0; border-radius: 4px; color: white; background: var(--orange); cursor: pointer; font-size: 11px; font-weight: 650; }
+    .deploy-submit:disabled { cursor: wait; opacity: .65; }
+    .deploy-result { display: none; margin-top: 14px; padding: 11px; border: 1px solid #dce5d8; border-radius: 4px; color: #496044; background: #f4f8f1; font-size: 10px; line-height: 1.55; }
+    .deploy-result.is-visible { display: block; }
+    .deploy-result strong { display: block; margin-bottom: 3px; font-size: 11px; }
+    .deploy-result a { color: #496044; font-family: var(--mono); }
+    .modal-foot { margin: 12px 0 0; color: #999b94; font-size: 9px; text-align: center; }
+
+    @media (max-width: 980px) {
+      .shell { width: min(100% - 36px, 780px); }
+      .workspace { grid-template-columns: 290px minmax(0, 1fr); gap: 12px; }
+      .brief-panel { padding: 15px; }
+      .stage-toolbar { padding: 9px 12px; }
+      .preview-area { padding: 10px; }
+      .site-links { gap: 11px; }
+      .mock-site { padding-right: 5%; padding-left: 5%; }
+      .hero-grid { gap: 4%; }
+    }
+    @media (max-width: 720px) {
+      .shell { width: calc(100% - 28px); }
+      .topbar { height: 58px; }
+      .workspace-label { display: none; }
+      .intro { align-items: flex-start; flex-direction: column; gap: 9px; padding: 24px 0 18px; }
+      .intro-note { max-width: 420px; }
+      .workspace { grid-template-columns: 1fr; }
+      .brief-panel { padding: 16px; }
+      .brief-input { min-height: 118px; }
+      .build-button { margin-top: 16px; }
+      .stage-toolbar { min-height: 54px; }
+      .saved-state { display: none; }
+      .preview-area { padding: 8px; }
+      .browser-frame { min-height: 365px; }
+      .mock-site { min-height: 334px; padding: 0 6%; }
+      .hero-grid { min-height: 278px; padding: 24px 0; }
+      .site-nav { height: 48px; }
+      .site-links { gap: 9px; font-size: 8px; }
+      .site-links a:nth-child(2) { display: none; }
+      .site-contact { padding: 6px 7px; }
+      .site-title { font-size: clamp(28px, 8vw, 40px); }
+      .artwork { aspect-ratio: .9; }
+      .alternate-view { min-height: 365px; padding: 17px; }
+      .under-stage { padding: 10px 12px; }
+    }
+    @media (max-width: 430px) {
+      .intro-note { font-size: 11px; }
+      .stage-toolbar { align-items: flex-start; }
+      .project-title { max-width: 150px; }
+      .deploy-button { min-height: 32px; padding: 0 9px; font-size: 10px; }
+      .view-tabs { gap: 15px; padding: 0 12px; }
+      .hero-grid { grid-template-columns: 1fr .7fr; gap: 4%; }
+      .site-links a:first-child { display: none; }
+      .site-description { font-size: 9px; }
+      .site-cta { gap: 5px; padding: 8px; font-size: 8px; }
+      .data-list { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar shell">
+    <a class="brand" href="#" aria-label="draftwork home"><span class="brand-mark">d</span>draftwork</a>
+    <div class="topbar-right">
+      <div class="workspace-label"><span class="workspace-dot"></span>Personal workspace <span aria-hidden="true">⌄</span></div>
+      <div class="avatar" aria-label="Account">S</div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="intro">
+      <div>
+        <p class="eyebrow">A little less blank canvas</p>
+        <h1>From job brief to<br>first click-through.</h1>
+      </div>
+      <p class="intro-note">Paste an Upwork post. Get a client-ready starting point you can click through, tune, and share.</p>
+    </section>
+
+    <section class="workspace" aria-label="Prototype builder">
+      <aside class="brief-panel">
+        <div class="panel-kicker">
+          <div class="section-label"><span class="step-number">01</span>PROJECT BRIEF</div>
+          <button class="text-button" id="sampleButton" type="button">Load sample</button>
+        </div>
+        <label class="field-label" for="jobTitle">Upwork job title</label>
+        <input class="text-input" id="jobTitle" value="Brand site for a mindful architecture studio" autocomplete="off">
+        <label class="field-label" for="jobBrief">Job description</label>
+        <textarea class="brief-input" id="jobBrief">We're a small architecture studio focused on sustainable homes and thoughtful renovations. Looking for a designer to create a warm, editorial website that shows our projects, introduces the team, and helps potential clients book a first conversation.
+
+Pages: Home, Projects, Studio, Contact.
+Style: Natural materials, quiet confidence, generous imagery.
+Must-have: Project gallery and a simple inquiry form.</textarea>
+        <div class="field-hint"><span>Paste the client post or your own notes</span><span id="charCount">0 chars</span></div>
+        <div class="meta-row">
+          <div class="meta-box"><span>Budget</span><strong>$1,500–$3,000</strong></div>
+          <div class="meta-box"><span>Project type</span><strong>Website design</strong></div>
+        </div>
+        <div class="divider"></div>
+        <div class="section-label" style="margin-bottom: 12px">02&nbsp; OPENAI SETUP</div>
+        <label class="field-label" for="openaiKey">OpenAI API key <span style="color:#a0a098;font-weight:400">(demo only)</span></label>
+        <div class="credential-row">
+          <input class="text-input credential-input" id="openaiKey" type="password" placeholder="Paste a placeholder key" autocomplete="off" spellcheck="false" aria-describedby="keyDemoNote openaiError">
+          <button class="reveal-button" id="revealOpenaiKey" type="button" aria-label="Show OpenAI API key">Show</button>
+        </div>
+        <label class="field-label" for="modelSelect">Choose a model</label>
+        <select class="model-select" id="modelSelect">
+          <option value="gpt-4.1-mini">GPT-4.1 mini · quicker, lower cost</option>
+          <option value="gpt-4.1">GPT-4.1 · detailed project briefs</option>
+          <option value="gpt-4o">GPT-4o · multimodal generation</option>
+          <option value="gpt-4o-mini">GPT-4o mini · lightweight</option>
+        </select>
+        <p class="key-demo-note" id="keyDemoNote">Presentation demo only: enter any placeholder text. No key is sent or stored.</p>
+        <p class="field-error" id="openaiError" role="alert">Enter placeholder text to continue the demo.</p>
+        <div class="divider"></div>
+        <div class="section-label" style="margin-bottom: 12px">GENERATED STARTING POINT</div>
+        <ul class="output-list">
+          <li><span class="check">✓</span>Responsive landing page</li>
+          <li><span class="check">✓</span>Projects &amp; studio pages</li>
+          <li><span class="check">✓</span>Sample content and imagery</li>
+        </ul>
+        <button class="build-button" id="buildButton" type="button">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m19 15 .9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15Z" fill="currentColor"/></svg>
+          Build POC
+        </button>
+      </aside>
+
+      <section class="stage-panel" aria-label="Generated project preview">
+        <div class="stage-toolbar">
+          <div class="project-heading">
+            <p class="project-title" id="previewProjectTitle">Fieldwork Studio <span style="color:#a2a39c;font-weight:400">/</span> Home</p>
+            <div class="project-subtitle" id="projectSubtitle">Sample project <span aria-hidden="true">·</span> preview only</div>
+          </div>
+          <div class="toolbar-actions">
+            <span class="saved-state" id="savedState">All changes saved</span>
+            <button class="deploy-button" id="openDeploy" type="button">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v5h14v-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Deploy
+            </button>
+          </div>
+        </div>
+
+        <div class="view-tabs" role="tablist" aria-label="Project views">
+          <button class="tab" id="tabPreview" type="button" role="tab" aria-selected="true" data-view="preview">Preview</button>
+          <button class="tab" id="tabPages" type="button" role="tab" aria-selected="false" data-view="pages">Pages <span style="color:#a1a29c">4</span></button>
+          <button class="tab" id="tabData" type="button" role="tab" aria-selected="false" data-view="data">Content</button>
+        </div>
+
+        <div class="preview-area" id="previewArea">
+          <div class="browser-frame" id="browserFrame">
+            <div class="browser-bar">
+              <div class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></div>
+              <div class="address">fieldwork-studio.preview.site</div>
+              <div class="browser-side">↗</div>
+            </div>
+            <div class="mock-site">
+              <nav class="site-nav" aria-label="Client site">
+                <a class="site-brand" href="#home" data-page="home" aria-label="Fieldwork Studio home">fieldwork<span>.</span></a>
+                <div class="site-links">
+                  <a href="#projects" data-page="projects">Projects</a>
+                  <a href="#studio" data-page="studio">Studio</a>
+                  <a class="site-contact" href="#contact" data-page="contact">Let's talk ↗</a>
+                </div>
+              </nav>
+              <div class="site-page-content" id="sitePageContent"></div>
+              <div class="site-foot"><span>INDEPENDENT ARCHITECTURE STUDIO</span><span>BASED IN PORTLAND, OR</span></div>
+            </div>
+          </div>
+          <div class="alternate-view" id="pagesView" role="tabpanel" aria-label="Project pages">
+            <p class="eyebrow">The site map</p>
+            <div class="page-list">
+              <button class="page-row" type="button" data-preview-page="home"><span><strong>Home</strong><span>Hero, studio introduction, featured project</span></span><span class="page-status">PREVIEW</span></button>
+              <button class="page-row" type="button" data-preview-page="projects"><span><strong>Projects</strong><span>Gallery of three sample homes</span></span><span class="page-status">PREVIEW</span></button>
+              <button class="page-row" type="button" data-preview-page="studio"><span><strong>Studio</strong><span>About, approach, and studio facts</span></span><span class="page-status">PREVIEW</span></button>
+              <button class="page-row" type="button" data-preview-page="contact"><span><strong>Contact</strong><span>Sample inquiry form and studio details</span></span><span class="page-status">PREVIEW</span></button>
+            </div>
+          </div>
+          <div class="alternate-view" id="dataView" role="tabpanel" aria-label="Sample content">
+            <p class="eyebrow">Sample content</p>
+            <div class="data-list">
+              <div class="data-item"><span>Studio name</span><strong>Fieldwork Studio</strong></div>
+              <div class="data-item"><span>Location</span><strong>Portland, Oregon</strong></div>
+              <div class="data-item"><span>Project count</span><strong>6 featured homes</strong></div>
+              <div class="data-item"><span>Primary action</span><strong>Start a conversation</strong></div>
+              <div class="data-item"><span>Visual direction</span><strong>Natural, editorial, calm</strong></div>
+              <div class="data-item"><span>Content source</span><strong>Generated sample data</strong></div>
+            </div>
+          </div>
+        </div>
+        <div class="under-stage"><span id="stageHint">Click around the preview to explore the generated site.</span><span class="screen-size"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M8 21h8m-4-4v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Desktop preview</span></div>
+      </section>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="modal-backdrop" id="deployModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="deploy-modal">
+      <div class="modal-top">
+        <div class="modal-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3 3 20h18L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+        <button class="close-button" id="closeDeploy" type="button" aria-label="Close deploy dialog">×</button>
+      </div>
+      <h2 class="modal-title" id="modalTitle">Ready for a first share?</h2>
+      <p class="modal-copy">Connect Vercel to put this prototype on a preview URL. In the finished product, your deployment would be created in your Vercel account.</p>
+      <div class="demo-notice"><span class="notice-mark">i</span><span><strong>Presentation demo:</strong> this screen does not contact Vercel. Use a fake key to see the simulated flow. Do not enter a real API key.</span></div>
+      <label class="field-label" for="vercelKey">Vercel API token <span style="color:#a0a098;font-weight:400">(demo only)</span></label>
+      <div class="key-wrap">
+        <input class="key-input" id="vercelKey" type="password" placeholder="vercel_demo_••••••••••••" autocomplete="off" spellcheck="false">
+        <button class="reveal-button" id="revealKey" type="button" aria-label="Show API token">Show</button>
+      </div>
+      <p class="security-note">A real version should send tokens only to a secure backend, never keep them in browser storage.</p>
+      <button class="deploy-submit" id="deploySubmit" type="button">Connect &amp; deploy preview</button>
+      <div class="deploy-result" id="deployResult" role="status" aria-live="polite"></div>
+      <p class="modal-foot">No credentials are saved or transmitted in this mockup.</p>
+    </div>
+  </div>
+
+  <script>
+    const sampleTitle = "Brand site for a mindful architecture studio";
+    const sampleBrief = "We're a small architecture studio focused on sustainable homes and thoughtful renovations. Looking for a designer to create a warm, editorial website that shows our projects, introduces the team, and helps potential clients book a first conversation.\n\nPages: Home, Projects, Studio, Contact.\nStyle: Natural materials, quiet confidence, generous imagery.\nMust-have: Project gallery and a simple inquiry form.";
+    const briefInput = document.querySelector("#jobBrief");
+    const jobTitle = document.querySelector("#jobTitle");
+    const toast = document.querySelector("#toast");
+    const modal = document.querySelector("#deployModal");
+    let toastTimer;
+    let generatedProjectName = "Fieldwork Studio";
+    let generatedSiteTitle = "Make room for a more thoughtful life.";
+    let generatedSiteDescription = "We design considered homes rooted in their landscape, built for the way you want to live.";
+    let selectedModel = "sample";
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("is-visible");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("is-visible"), 2400);
+    }
+
+    function updateCount() {
+      document.querySelector("#charCount").textContent = `${briefInput.value.length.toLocaleString()} chars`;
+    }
+
+    function showClientPage(page) {
+      const pages = {
+        home: `<div class="hero-grid"><div><p class="site-eyebrow">Spaces to live a little slower</p><h2 class="site-title">${escapeHtml(generatedSiteTitle)}</h2><p class="site-description">${escapeHtml(generatedSiteDescription)}</p><button class="site-cta" type="button" data-page="projects">Explore our work <span>↗</span></button></div><div class="artwork"><img class="art-image" src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&amp;fit=crop&amp;w=900&amp;q=85" alt="Warm, naturally lit contemporary home interior"><span class="art-sun"></span><span class="art-caption">A home, in its element / 01</span></div></div>`,
+        projects: `<section class="route-top"><p class="site-eyebrow">A few places we've made</p><h2 class="route-heading">Homes that know where they belong.</h2><p class="route-copy">A collection of considered renovations and new homes, shaped by their landscape and the lives lived inside them.</p></section><div class="project-grid"><article class="project-card"><img src="https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&amp;fit=crop&amp;w=600&amp;q=80" alt="Oak House interior"><div><strong>Oak House</strong><span>Portland · Renovation · 2025</span></div></article><article class="project-card"><img src="https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&amp;fit=crop&amp;w=600&amp;q=80" alt="Cedar Ridge home"><div><strong>Cedar Ridge</strong><span>Columbia River · New build · 2024</span></div></article><article class="project-card"><img src="https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&amp;fit=crop&amp;w=600&amp;q=80" alt="Garden House interior"><div><strong>Garden House</strong><span>Willamette Valley · Addition · 2024</span></div></article></div>`,
+        studio: `<div class="studio-layout"><div><p class="site-eyebrow">A small studio, with a point of view</p><h2 class="route-heading">Good spaces start with paying attention.</h2><p class="route-copy">Fieldwork is an independent architecture practice led by Maya Chen and Eli Navarro. We work at the scale of the room and the landscape, making places that feel generous, grounded, and made to last.</p><p class="route-copy" style="margin-top:12px">Our process is collaborative and hands-on, from the first sketch to the last cabinet pull.</p></div><div class="studio-facts"><div class="studio-fact"><strong>2016</strong><span>Studio founded</span></div><div class="studio-fact"><strong>12</strong><span>Years of practice</span></div><div class="studio-fact"><strong>2</strong><span>Studio partners</span></div><div class="studio-fact"><strong>OR</strong><span>Home base</span></div></div></div>`,
+        contact: `<div class="contact-layout"><div><p class="site-eyebrow">Start with a conversation</p><h2 class="route-heading">Have a place in mind?</h2><p class="route-copy">Tell us a little about what you are planning. We will be in touch within two working days.</p><form class="contact-form" id="sampleContactForm" style="margin-top:17px"><input aria-label="Your name" placeholder="Your name" required><input aria-label="Email address" type="email" placeholder="Email address" required><textarea aria-label="Project notes" placeholder="A few words about your project" required></textarea><button type="submit">Send an inquiry ↗</button></form></div><div class="contact-details"><span>Visit</span><strong>2131 SE Division St<br>Portland, Oregon</strong><span>Email</span><strong>hello@fieldwork.studio</strong><span>Studio hours</span><strong>Monday–Friday<br>9:00–5:00 PST</strong></div></div>`
+      };
+      const pageNames = { home: "Home", projects: "Projects", studio: "Studio", contact: "Contact" };
+      const activePage = pages[page] ? page : "home";
+      document.querySelector("#sitePageContent").innerHTML = pages[activePage];
+      document.querySelectorAll(".site-links [data-page]").forEach((link) => {
+        if (link.dataset.page === activePage) link.setAttribute("aria-current", "page");
+        else link.removeAttribute("aria-current");
+      });
+      document.querySelector(".address").textContent = `fieldwork-studio.preview.site${activePage === "home" ? "" : `/${activePage}`}`;
+      document.querySelector("#previewProjectTitle").innerHTML = `${escapeHtml(generatedProjectName)} <span style="color:#a2a39c;font-weight:400">/</span> ${pageNames[activePage]}`;
+      document.querySelector("#stageHint").textContent = `${pageNames[activePage]} page · sample content`;
+    }
+
+    document.querySelector(".mock-site").addEventListener("click", (event) => {
+      const pageLink = event.target.closest("[data-page]");
+      if (!pageLink) return;
+      event.preventDefault();
+      showClientPage(pageLink.dataset.page);
+      showView("preview");
+    });
+    document.querySelector(".mock-site").addEventListener("submit", (event) => {
+      if (event.target.id !== "sampleContactForm") return;
+      event.preventDefault();
+      event.target.reset();
+      showToast("Sample inquiry received. No message was sent.");
+    });
+    document.querySelectorAll("[data-preview-page]").forEach((button) => button.addEventListener("click", () => {
+      showClientPage(button.dataset.previewPage);
+      showView("preview");
+    }));
+
+    function showView(view) {
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.setAttribute("aria-selected", String(tab.dataset.view === view));
+      });
+      document.querySelector("#browserFrame").style.display = view === "preview" ? "" : "none";
+      document.querySelector("#pagesView").classList.toggle("is-visible", view === "pages");
+      document.querySelector("#dataView").classList.toggle("is-visible", view === "data");
+      document.querySelector("#stageHint").textContent = view === "preview"
+        ? "Click around the preview to explore the generated site."
+        : view === "pages" ? "Four responsive pages mapped from the client brief."
+        : "Starter content is sample data and can be replaced with client details.";
+    }
+
+    document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => showView(tab.dataset.view)));
+    briefInput.addEventListener("input", updateCount);
+    updateCount();
+
+    document.querySelector("#sampleButton").addEventListener("click", () => {
+      jobTitle.value = sampleTitle;
+      briefInput.value = sampleBrief;
+      updateCount();
+      showToast("Sample Upwork brief loaded.");
+    });
+
+    document.querySelector("#buildButton").addEventListener("click", () => {
+      const title = jobTitle.value.trim();
+      const description = briefInput.value.trim();
+      const openaiKey = document.querySelector("#openaiKey");
+      const openaiError = document.querySelector("#openaiError");
+      if (!title || !description) {
+        showToast("Add a job title and description to build a prototype.");
+        return;
+      }
+      if (!openaiKey.value.trim()) {
+        openaiError.classList.add("is-visible");
+        openaiKey.focus();
+        return;
+      }
+      openaiError.classList.remove("is-visible");
+      const selectedModel = document.querySelector("#modelSelect").value;
+      openaiKey.value = "";
+      const firstSentence = description.split(/[.!?\n]/).find((sentence) => sentence.trim().length > 28)?.trim();
+      generatedProjectName = title;
+      generatedSiteTitle = title.replace(/^(brand site|website|web design)\s+(for\s+)?/i, "").replace(/\s+/g, " ").replace(/[.!?]$/, "").slice(0, 58) || "A more thoughtful online home.";
+      generatedSiteDescription = firstSentence
+        ? `${firstSentence.replace(/\s+/g, " ").slice(0, 145)}${firstSentence.length > 145 ? "…" : ""}`
+        : "A considered first draft shaped around your project brief.";
+      document.querySelector("#savedState").textContent = "Demo build complete";
+      document.querySelector("#projectSubtitle").textContent = `Demo build · ${selectedModel} · sample preview only`;
+      showClientPage("home");
+      showView("preview");
+      showToast(`Demo POC built with ${selectedModel}. No API request was made.`);
+    });
+
+    document.querySelector("#openaiKey").addEventListener("input", () => {
+      document.querySelector("#openaiError").classList.remove("is-visible");
+    });
+    document.querySelector("#revealOpenaiKey").addEventListener("click", () => {
+      const input = document.querySelector("#openaiKey");
+      const reveal = input.type === "password";
+      input.type = reveal ? "text" : "password";
+      document.querySelector("#revealOpenaiKey").textContent = reveal ? "Hide" : "Show";
+      document.querySelector("#revealOpenaiKey").setAttribute("aria-label", `${reveal ? "Hide" : "Show"} OpenAI API key`);
+    });
+
+    function escapeHtml(value) {
+      return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]);
+    }
+
+    showClientPage("home");
+
+    function openModal() {
+      modal.classList.add("is-open");
+      document.querySelector("#vercelKey").focus();
+    }
+    function closeModal() {
+      modal.classList.remove("is-open");
+      document.querySelector("#deployResult").classList.remove("is-visible");
+      document.querySelector("#deploySubmit").disabled = false;
+      document.querySelector("#deploySubmit").textContent = "Connect & deploy preview";
+      document.querySelector("#vercelKey").value = "";
+      document.querySelector("#vercelKey").type = "password";
+      document.querySelector("#revealKey").textContent = "Show";
+    }
+    document.querySelector("#openDeploy").addEventListener("click", openModal);
+    document.querySelector("#closeDeploy").addEventListener("click", closeModal);
+    modal.addEventListener("click", (event) => { if (event.target === modal) closeModal(); });
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && modal.classList.contains("is-open")) closeModal(); });
+
+    document.querySelector("#revealKey").addEventListener("click", () => {
+      const input = document.querySelector("#vercelKey");
+      const reveal = input.type === "password";
+      input.type = reveal ? "text" : "password";
+      document.querySelector("#revealKey").textContent = reveal ? "Hide" : "Show";
+    });
+
+    document.querySelector("#deploySubmit").addEventListener("click", () => {
+      const key = document.querySelector("#vercelKey").value.trim();
+      const result = document.querySelector("#deployResult");
+      const button = document.querySelector("#deploySubmit");
+      if (!key) {
+        showToast("Enter any placeholder text to preview the demo deploy.");
+        document.querySelector("#vercelKey").focus();
+        return;
+      }
+      button.disabled = true;
+      result.classList.add("is-visible");
+      result.innerHTML = "<strong>Connecting to Vercel…</strong>Checking the demo token";
+      button.textContent = "Deploying preview…";
+      setTimeout(() => { result.innerHTML = "<strong>Building your preview…</strong>Preparing a sample deployment"; }, 900);
+      setTimeout(() => {
+        result.innerHTML = "<strong>Demo complete · no site was deployed</strong>This is where your shareable preview would appear:<br><a href=\"#preview-url\" id=\"previewUrl\">fieldwork-studio-preview.vercel.app ↗</a>";
+        button.disabled = false;
+        button.textContent = "Run demo again";
+        document.querySelector("#previewUrl").addEventListener("click", (event) => {
+          event.preventDefault();
+          showToast("A real Vercel URL will be available after backend integration.");
+        });
+      }, 2100);
+    });
+  </script>
+</body>
+</html>
