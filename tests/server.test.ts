@@ -40,6 +40,7 @@ function startFake(): Promise<number> {
       const prod = Boolean(fetcherMatch[1]);
       seen.fetcherAuth.push(String(req.headers["x-api-key"] ?? ""));
       seen.fetcherPaths.push(url.pathname);
+      if (req.headers["x-api-key"] === "forbidden-key-0000") return json(403, { error: "Forbidden" });
       if (req.headers["x-api-key"] !== (prod ? GOOD_PROD_FETCH_KEY : GOOD_FETCH_KEY)) return json(401, { error: "Unauthorized" });
       const id = decodeURIComponent(fetcherMatch[2]);
       if (id === "02missing000000000000") return json(404, { error: "Job not found" });
@@ -900,5 +901,36 @@ describe("generation time limit", () => {
       expect(res.body.error).toMatch(/longer than this server waits \(2 seconds\)/);
       expect(res.body.error).toMatch(/faster model/);
       expect(Date.now() - started).toBeLessThan(5000); // no retry on Vercel, so one timeout, not two
+    }), 40000);
+});
+
+describe("env values pasted with quotes or spaces (as dashboards allow)", () => {
+  const JOB = "02abc1234567890def";
+
+  it("a quoted, padded Job Fetcher key still works as the server default", () =>
+    withEnv({ JOB_FETCHER_PROD_API_KEY: `  "${GOOD_PROD_FETCH_KEY}" \n`, JOB_FETCHER_TARGET: "production" }, async () => {
+      expect((await call("GET", "/credentials")).body["fetcher-production"]).toMatchObject({ hasDefault: true });
+      const res = await call("POST", "/fetcher/lookup", { jobId: JOB, target: "production" });
+      expect(res.status).toBe(200);
+      expect(seen.fetcherAuth.at(-1)).toBe(GOOD_PROD_FETCH_KEY); // exactly the bare key was sent upstream
+    }), 40000);
+
+  it("a quoted OpenAI key and Vercel token still work as defaults", () =>
+    withEnv({ OPENAI_KEY: `'${GOOD_KEY}'`, VERCEL_TOKEN: ` "${GOOD_TOKEN}" ` }, async () => {
+      expect((await call("POST", "/generate", brief)).status).toBe(200);
+      expect(seen.openaiAuth.at(-1)).toBe(`Bearer ${GOOD_KEY}`);
+      expect((await call("POST", "/deploy", { poc: SAMPLE_POC })).status).toBe(200);
+      expect(seen.vercelAuth.at(-1)).toBe(`Bearer ${GOOD_TOKEN}`);
+    }), 40000);
+
+  it("a wrong production key says 401, a refused one says 403, and neither echoes the key", () =>
+    withEnv({}, async () => {
+      const rejected = await call("POST", "/fetcher/lookup", { jobId: JOB, target: "production", apiKey: "wrong-key-secret-1234" });
+      expect(rejected.status).toBe(502);
+      expect(rejected.body.error).toMatch(/\(production\) rejected the API key \(401\)/);
+      const refused = await call("POST", "/fetcher/lookup", { jobId: JOB, target: "production", apiKey: "forbidden-key-0000" });
+      expect(refused.status).toBe(502);
+      expect(refused.body.error).toMatch(/\(production\) refused the request \(403\)/);
+      expect(JSON.stringify([rejected.body, refused.body])).not.toMatch(/wrong-key-secret|forbidden-key-0000/);
     }), 40000);
 });

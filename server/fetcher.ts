@@ -106,7 +106,14 @@ export async function lookupJob(args: { jobId: unknown; target: FetcherTarget; a
   }
   if (res.status === 404) throw new UserFacingError(`That job isn't in Job Fetcher (${args.target}) yet. Fill the brief in by hand.`, 404);
   if (res.status === 401 || res.status === 403) {
-    throw new UserFacingError(`Job Fetcher (${args.target}) rejected the API key. Check the key in .env, or use your own key.`, 502);
+    // Status only: enough to tell "key rejected" (401) from "request refused" (403) in the host's logs, no secrets.
+    console.error(`[fetcher] ${args.target} answered ${res.status}; key length ${args.apiKey?.length ?? 0}`);
+    throw new UserFacingError(
+      res.status === 401
+        ? `Job Fetcher (${args.target}) rejected the API key (401). Check the key in .env / Vercel (no quotes or spaces), or use your own key.`
+        : `Job Fetcher (${args.target}) refused the request (403). The key may lack access, or this server may be blocked. Check the key, or use your own.`,
+      502,
+    );
   }
   if (!res.ok) throw new UserFacingError(`Job Fetcher answered with an error (${res.status}). Please retry.`, 502);
 

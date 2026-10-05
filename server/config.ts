@@ -1,4 +1,5 @@
 import path from "node:path";
+import { cleanEnv } from "./env";
 
 // Load .env (Node 20.12+). Variables already in the environment win.
 try {
@@ -8,6 +9,8 @@ try {
 }
 
 const env = process.env;
+/** An env var with dashboard-paste mishaps (quotes, whitespace) cleaned off. */
+const val = (name: string) => cleanEnv(name, env[name]);
 
 /** A PEM from an env var: base64 of the PEM, or the PEM itself (with real or escaped newlines). */
 function pem(value: string | undefined): string | undefined {
@@ -25,10 +28,10 @@ const cleanUrl = (value: string | undefined) => (value || "").trim().replace(/\/
 function fetcherConfig() {
   const targets: Record<FetcherTarget, { url?: string; defaultKey?: string }> = {
     // JOB_FETCHER_URL / JOB_FETCHER_API_KEY are accepted as the local target's older names.
-    local: { url: cleanUrl(env.JOB_FETCHER_LOCAL_URL || env.JOB_FETCHER_URL), defaultKey: env.JOB_FETCHER_LOCAL_API_KEY || env.JOB_FETCHER_API_KEY || undefined },
-    production: { url: cleanUrl(env.JOB_FETCHER_PROD_URL), defaultKey: env.JOB_FETCHER_PROD_API_KEY || undefined },
+    local: { url: cleanUrl(val("JOB_FETCHER_LOCAL_URL") || val("JOB_FETCHER_URL")), defaultKey: val("JOB_FETCHER_LOCAL_API_KEY") || val("JOB_FETCHER_API_KEY") },
+    production: { url: cleanUrl(val("JOB_FETCHER_PROD_URL")), defaultKey: val("JOB_FETCHER_PROD_API_KEY") },
   };
-  const wanted = (env.JOB_FETCHER_TARGET || "").trim().toLowerCase();
+  const wanted = (val("JOB_FETCHER_TARGET") || "").toLowerCase();
   const configured = FETCHER_TARGETS.filter((t) => targets[t].url);
   const defaultTarget = (configured.find((t) => t === wanted) ?? configured[0]) as FetcherTarget | undefined;
   return { targets, defaultTarget };
@@ -39,7 +42,7 @@ export const config = {
   /** True when running as a Vercel function: no writable disk, a hard time limit, and one DB connection per instance. */
   onVercel: Boolean(env.VERCEL),
   /** Aiven (or any) Postgres. When set, saved keys live here instead of in a local file. */
-  databaseUrl: env.DATABASE_URL || undefined,
+  databaseUrl: val("DATABASE_URL"),
   /** CA certificate for verified TLS to the database (Aiven's ca.pem). Base64 (preferred) or raw PEM. */
   databaseCaCert: pem(env.DATABASE_CA_CERT_B64 || env.DATABASE_CA_CERT),
   databasePoolMax: Number(env.DATABASE_POOL_MAX) > 0 ? Number(env.DATABASE_POOL_MAX) : env.VERCEL ? 1 : 5,
@@ -70,10 +73,10 @@ export const config = {
    */
   fetcher: fetcherConfig(),
   defaults: {
-    openaiKey: env.OPENAI_API_KEY || env.OPENAI_KEY || undefined,
-    vercelToken: env.VERCEL_TOKEN || undefined,
-    vercelTeamId: env.VERCEL_TEAM_ID || env.TEAM_ID || undefined,
-    model: env.OPENAI_MODEL || undefined,
+    openaiKey: val("OPENAI_API_KEY") || val("OPENAI_KEY"),
+    vercelToken: val("VERCEL_TOKEN"),
+    vercelTeamId: val("VERCEL_TEAM_ID") || val("TEAM_ID"),
+    model: val("OPENAI_MODEL"),
   },
 };
 
