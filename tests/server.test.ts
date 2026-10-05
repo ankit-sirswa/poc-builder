@@ -18,7 +18,7 @@ let app: ChildProcess;
 let base = "";
 let dataDir = "";
 let cookie = "";
-const seen = { openaiAuth: [] as string[], openaiOrgHeaders: [] as { org?: string; project?: string }[], openaiBody: null as any, vercelFiles: [] as string[], vercelQuery: "", vercelPolls: 0, vercelAuth: [] as string[], fetcherAuth: [] as string[], fetcherPaths: [] as string[] };
+const seen = { openaiAuth: [] as string[], openaiOrgHeaders: [] as { org?: string; project?: string }[], openaiBody: null as any, vercelFiles: [] as string[], vercelQuery: "", vercelPolls: 0, vercelAuth: [] as string[], fetcherAuth: [] as string[], fetcherPaths: [] as string[], flakyServed: false };
 
 const readBody = (req: http.IncomingMessage) =>
   new Promise<string>((resolve) => {
@@ -43,6 +43,8 @@ function startFake(): Promise<number> {
       if (req.headers["x-api-key"] === "forbidden-key-0000") return json(403, { error: "Forbidden" });
       if (req.headers["x-api-key"] !== (prod ? GOOD_PROD_FETCH_KEY : GOOD_FETCH_KEY)) return json(401, { error: "Unauthorized" });
       const id = decodeURIComponent(fetcherMatch[2]);
+      if (id === "02flaky000000000000" && !seen.flakyServed) { seen.flakyServed = true; req.socket.destroy(); return; } // drops the first connection
+      if (id === "02hang0000000000000") return; // never answers
       if (id === "02missing000000000000") return json(404, { error: "Job not found" });
       if (id === "02boom00000000000000") return json(500, { error: "kaboom with secrets" });
       return json(200, {
@@ -933,4 +935,47 @@ describe("env values pasted with quotes or spaces (as dashboards allow)", () => 
       expect(refused.body.error).toMatch(/\(production\) refused the request \(403\)/);
       expect(JSON.stringify([rejected.body, refused.body])).not.toMatch(/wrong-key-secret|forbidden-key-0000/);
     }), 40000);
+});
+
+describe("Job Fetcher network failures", () => {
+  const JOB = "02abc1234567890def";
+
+  it("retries once when a connection drops, so a momentary blip doesn't surface as an error", () =>
+    withEnv({}, async () => {
+      seen.flakyServed = false;
+      const before = seen.fetcherAuth.length;
+      const res = await call("POST", "/fetcher/lookup", { jobId: "02flaky000000000000", target: "production", apiKey: GOOD_PROD_FETCH_KEY });
+      expect(res.status).toBe(200);
+      expect(seen.fetcherAuth.length - before).toBe(2); // first attempt dropped, second served
+    }), 40000);
+
+  it("says 'timed out' when Job Fetcher never answers, after trying twice", () =>
+    withEnv({ FETCHER_TIMEOUT_MS: "700" }, async () => {
+      const started = Date.now();
+      const res = await call("POST", "/fetcher/lookup", { jobId: "02hang0000000000000", target: "production", apiKey: GOOD_PROD_FETCH_KEY });
+      expect(res.status).toBe(503);
+      expect(res.body.error).toMatch(/Couldn't reach Job Fetcher \(production\): timed out\./);
+      expect(Date.now() - started).toBeGreaterThan(1300); // two attempts, not one
+      expect(Date.now() - started).toBeLessThan(6000);
+    }), 40000);
+
+  it("says 'connection refused' for a closed port and 'DNS lookup failed' for an unknown host", async () => {
+    // A port that was just free and is now closed (Node's fetch refuses some low ports outright, e.g. 1).
+    const closedPort = await new Promise<number>((resolve) => {
+      const probe = http.createServer().listen(0, () => {
+        const { port } = probe.address() as { port: number };
+        probe.close(() => resolve(port));
+      });
+    });
+    await withEnv({ JOB_FETCHER_PROD_URL: `http://127.0.0.1:${closedPort}` }, async () => {
+      const res = await call("POST", "/fetcher/lookup", { jobId: JOB, target: "production", apiKey: GOOD_PROD_FETCH_KEY });
+      expect(res.status).toBe(503);
+      expect(res.body.error).toMatch(/\): connection refused\./);
+    });
+    await withEnv({ JOB_FETCHER_PROD_URL: "http://no-such-host.invalid" }, async () => {
+      const res = await call("POST", "/fetcher/lookup", { jobId: JOB, target: "production", apiKey: GOOD_PROD_FETCH_KEY });
+      expect(res.status).toBe(503);
+      expect(res.body.error).toMatch(/\): DNS lookup failed\./);
+    });
+  }, 60000);
 });

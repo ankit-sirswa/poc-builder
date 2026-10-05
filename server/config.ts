@@ -51,6 +51,8 @@ export const config = {
   /** Optional shared password. When set, every API call except health and login needs a signed-in session. */
   appPassword: env.APP_PASSWORD || undefined,
   sessionSecret: env.SESSION_SECRET || env.CREDENTIAL_SECRET || undefined,
+  /** How long to wait for one Job Fetcher request before giving up (it is retried once). */
+  fetcherTimeoutMs: Number(env.FETCHER_TIMEOUT_MS) > 0 ? Number(env.FETCHER_TIMEOUT_MS) : 12_000,
   /** Cap on generate/deploy calls per minute per client (they cost money). */
   rateLimitPerMinute: Number(env.RATE_LIMIT_PER_MIN) > 0 ? Number(env.RATE_LIMIT_PER_MIN) : 12,
   production: env.NODE_ENV === "production",

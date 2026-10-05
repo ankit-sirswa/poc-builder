@@ -69,6 +69,18 @@ function requirementsFrom(job: Record<string, any>): string {
   return lines.join("\n");
 }
 
+/** A network failure in plain words, from Node's error codes (fixed identifiers, safe to show). */
+export function describeNetworkError(error: unknown): string {
+  const e = error as { name?: string; code?: string; cause?: { code?: string } };
+  const code = e?.cause?.code ?? e?.code ?? "";
+  if (e?.name === "TimeoutError" || e?.name === "AbortError" || code === "UND_ERR_CONNECT_TIMEOUT" || code === "ETIMEDOUT") return "timed out";
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") return "DNS lookup failed";
+  if (code === "ECONNREFUSED") return "connection refused";
+  if (code === "ECONNRESET" || code === "UND_ERR_SOCKET" || code === "EPIPE") return "connection reset";
+  if (/CERT|SSL|TLS/i.test(code)) return `TLS problem (${code})`;
+  return code ? `network error (${code})` : "network error";
+}
+
 /** Maps a Job Fetcher job (GET /api/jobs/:id) onto the brief form. Exported for tests. */
 export function mapJobToBrief(job: Record<string, any>, fallbackId: string): { brief: Brief; meta: FetchedJobMeta } {
   const id = text(job.id) || fallbackId;
@@ -95,19 +107,33 @@ export async function lookupJob(args: { jobId: unknown; target: FetcherTarget; a
   const id = normalizeJobId(args.jobId);
   if (!id) throw new UserFacingError("That doesn't look like an Upwork job ID. Paste the ID or the job URL.", 400);
 
-  let res: Response;
-  try {
-    res = await fetch(`${base}/api/jobs/${encodeURIComponent(id)}`, {
-      headers: args.apiKey ? { "X-API-Key": args.apiKey } : {},
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch {
-    throw new UserFacingError(`Couldn't reach Job Fetcher (${args.target}). Check that it's running and the URL in .env is right.`, 503);
+  const url = `${base}/api/jobs/${encodeURIComponent(id)}`;
+  const headers: Record<string, string> = args.apiKey ? { "X-API-Key": args.apiKey } : {};
+  let res: Response | undefined;
+  let failure = "";
+  // A read, so one retry is safe: network blips between a host and Job Fetcher are usually momentary.
+  for (let attempt = 1; attempt <= 2 && !res; attempt++) {
+    const started = Date.now();
+    try {
+      res = await fetch(url, { headers, signal: AbortSignal.timeout(config.fetcherTimeoutMs) });
+    } catch (error) {
+      failure = describeNetworkError(error);
+      // Reason and timing only (never the key or URL), so the host's logs can say what actually happened.
+      console.error(`[fetcher] ${args.target} attempt ${attempt} failed: ${failure} after ${Date.now() - started}ms`);
+      if (attempt === 1) await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+  }
+  if (!res) {
+    throw new UserFacingError(`Couldn't reach Job Fetcher (${args.target}): ${failure}. Check that it's running and the URL in .env / Vercel is right.`, 503);
   }
   if (res.status === 404) throw new UserFacingError(`That job isn't in Job Fetcher (${args.target}) yet. Fill the brief in by hand.`, 404);
   if (res.status === 401 || res.status === 403) {
     // Status only: enough to tell "key rejected" (401) from "request refused" (403) in the host's logs, no secrets.
-    console.error(`[fetcher] ${args.target} answered ${res.status}; key length ${args.apiKey?.length ?? 0}`);
+    const snippet = (await res.clone().text().catch(() => "")).replace(/\s+/g, " ").slice(0, 100);
+    const safe = args.apiKey ? snippet.split(args.apiKey).join("[key]") : snippet;
+    console.error(
+      `[fetcher] ${args.target} answered ${res.status}; key length ${args.apiKey?.length ?? 0}; server=${res.headers.get("server") ?? "?"}; via=${res.headers.get("via") ?? "-"}; body="${safe}"`,
+    );
     throw new UserFacingError(
       res.status === 401
         ? `Job Fetcher (${args.target}) rejected the API key (401). Check the key in .env / Vercel (no quotes or spaces), or use your own key.`
