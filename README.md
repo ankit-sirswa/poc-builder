@@ -31,21 +31,28 @@ API keys are secrets. A production version must not store OpenAI or Vercel keys 
 
 This deploys **the POC builder app itself**. (How the POC sites it generates get deployed is separate and unchanged.) The app is a static React build served by Vercel's CDN plus one Vercel function (`api/index.ts`) running the Express API; `vercel.json` wires them together. Saved keys live in Postgres because Vercel functions have no persistent disk.
 
-### 1. Aiven Postgres
-1. Create a PostgreSQL service (the free plan is enough).
-2. Under **Allowed IP addresses** keep `0.0.0.0/0` (Vercel's outbound IPs aren't fixed).
-3. Copy the **Service URI** (`postgres://avnadmin:<password>@<host>:<port>/defaultdb?sslmode=require`). If you create a **connection pool** (transaction mode), use that pool's URI instead: serverless functions open many short connections and small plans have few.
-4. Download the **CA certificate** (`ca.pem`) and base64 it: `base64 -w0 ca.pem`.
+### 1. Postgres (Supabase or Aiven; any Postgres works)
 
 The app creates its one table (`credentials`) itself on first use.
+
+**Supabase**
+1. Create a project (note the database password; letters and digits only avoids URL-encoding problems).
+2. Click **Connect** and copy the **Transaction pooler** connection string (port `6543`, user `postgres.<project-ref>`), then put your password in place of `[YOUR-PASSWORD]`. Do **not** use the "Direct connection": it is IPv6-only and Vercel can't reach it. If your password has characters like `@ # / ? : %`, URL-encode them.
+3. `DATABASE_CA_CERT_B64` is optional. Leave it empty and the connection is encrypted but the server's identity isn't verified; for full verification download Supabase's CA under **Database → SSL Configuration** and base64 it (`base64 -w0 ca.crt`).
+4. The app locks its table down: Supabase publishes tables in `public` through a web API usable with the public anon key, so the app enables row-level security on `credentials` (with no policies) and revokes the `anon` and `authenticated` roles. Don't add policies or re-grant access to that table.
+5. Free projects pause after about a week without activity. While paused the app says the database isn't reachable; restore the project from the Supabase dashboard.
+
+**Aiven**
+1. Create a PostgreSQL service and keep **Allowed IP addresses** at `0.0.0.0/0` (Vercel's outbound IPs aren't fixed).
+2. Copy the **Service URI** (use a **connection pool** URI, transaction mode, if you create one) and download `ca.pem`, then `base64 -w0 ca.pem` for `DATABASE_CA_CERT_B64`.
 
 ### 2. Vercel project
 Import the GitHub repo as a new project. The framework preset can stay "Other": `vercel.json` already sets the build command and output directory. Add these environment variables (Production):
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | Aiven Service URI (or pool URI) |
-| `DATABASE_CA_CERT_B64` | base64 of Aiven's `ca.pem` (without it the connection is encrypted but the server's identity isn't verified) |
+| `DATABASE_URL` | Supabase **transaction pooler** URI (port 6543), or Aiven's service/pool URI |
+| `DATABASE_CA_CERT_B64` | optional: base64 of the database's CA certificate. Without it the connection is encrypted but the server's identity isn't verified |
 | `CREDENTIAL_SECRET` | long random string (`openssl rand -hex 32`). Changing it later makes saved keys unreadable |
 | `APP_PASSWORD` | the shared password for your team. **Set this**: otherwise anyone with the URL can spend your `.env` keys |
 | `SESSION_SECRET` | another long random string (signs the sign-in cookie; required when `APP_PASSWORD` is set) |
@@ -54,7 +61,7 @@ Import the GitHub repo as a new project. The framework preset can stay "Other": 
 | `VERCEL_TOKEN`, `TEAM_ID` | only for the existing "deploy the generated POC" button; not needed to deploy this app |
 
 ### 3. Check it
-Open the URL, sign in, and the model list should load once a key is available. If saving a key says the database isn't reachable, re-check `DATABASE_URL`, the CA, and the Aiven IP allowlist.
+Open the URL, sign in, and the model list should load once a key is available. If saving a key says the database isn't reachable, re-check `DATABASE_URL` (pooler URI, encoded password), the CA, and any IP allowlist. A message that the database connection is "misconfigured" means `DATABASE_URL` itself is malformed.
 
 ### Limits to know about
 - **Time limit:** the API function is configured for 60 seconds (the longest assumed safe on the free Hobby plan). The app stops waiting for OpenAI after 55 seconds and says so, so use a fast model such as `gpt-4.1-mini`. Reasoning models may not fit. Raise `maxDuration` in `vercel.json` (and `GENERATION_TIMEOUT_MS`) only if your plan allows more.
@@ -88,7 +95,7 @@ Configuration lives in `.env` (copy `.env.example`):
 | `JOB_FETCHER_PROD_API_KEY` | Default key for the deployed fetcher |
 | `JOB_FETCHER_TARGET` | Which source is selected first: `local` or `production` |
 | `RATE_LIMIT_PER_MIN` | Cap on generate/deploy calls per minute per client (default 12) |
-| `DATABASE_URL`, `DATABASE_CA_CERT_B64` | Postgres for saved keys (Aiven). Without `DATABASE_URL`, saved keys use a local encrypted file |
+| `DATABASE_URL`, `DATABASE_CA_CERT_B64` | Postgres for saved keys (Supabase, Aiven, any). Without `DATABASE_URL`, saved keys use a local encrypted file |
 | `APP_PASSWORD`, `SESSION_SECRET` | Optional shared sign-in. Unset = no login (local development) |
 | `PORT`, `DATA_DIR`, `CREDENTIAL_SECRET` | Server port, where saved keys are stored, and the secret that encrypts them |
 

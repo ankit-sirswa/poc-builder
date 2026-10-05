@@ -742,6 +742,59 @@ describe.skipIf(!TEST_DB)("Postgres key vault", () => {
     }
   }, 60000);
 
+  it("locks the table against Supabase's public API roles (anon / authenticated)", async () => {
+    const admin = new Client({ connectionString: TEST_DB, ssl: false });
+    await admin.connect();
+    try {
+      // Reproduce Supabase: those roles exist and automatically get access to every new table in public.
+      await admin.query(`DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+      END $$`);
+      await admin.query("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated");
+      await admin.query("GRANT USAGE ON SCHEMA public TO anon, authenticated");
+      await admin.query("DROP TABLE IF EXISTS credentials");
+
+      await withEnv(dbEnv, async () => {
+        await call("PUT", "/credentials/openai", { value: GOOD_KEY }); // first use creates the table, with those default grants applied
+
+        const flags = await admin.query("SELECT relrowsecurity FROM pg_class WHERE relname = 'credentials'");
+        expect(flags.rows[0].relrowsecurity).toBe(true);
+
+        for (const role of ["anon", "authenticated"]) {
+          await admin.query(`SET ROLE ${role}`);
+          await expect(admin.query("SELECT * FROM credentials")).rejects.toThrow(/permission denied/);
+          await expect(admin.query("DELETE FROM credentials")).rejects.toThrow(/permission denied/);
+          await admin.query("RESET ROLE");
+        }
+
+        // Second layer: even if someone later re-grants access, row-level security (with no policy) shows those roles nothing.
+        await admin.query("GRANT SELECT, DELETE ON credentials TO anon");
+        await admin.query("SET ROLE anon");
+        expect((await admin.query("SELECT count(*)::int AS n FROM credentials")).rows[0].n).toBe(0);
+        await admin.query("DELETE FROM credentials");
+        await admin.query("RESET ROLE");
+
+        // The server's own connection (the owner) is unaffected.
+        expect((await call("GET", "/credentials")).body.openai).toMatchObject({ saved: true, last4: "1234" });
+        await call("DELETE", "/credentials/openai");
+      });
+    } finally {
+      await admin.query("RESET ROLE").catch(() => undefined);
+      await admin.query("ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated").catch(() => undefined);
+      await admin.end();
+    }
+  }, 60000);
+
+  it("tells you when DATABASE_URL is malformed (e.g. an unencoded @ in the password) without echoing it", () =>
+    withEnv({ ...dbEnv, DATABASE_URL: "postgres://postgres.ref:my@pass-secret@db.example.com:6543/postgres" }, async () => {
+      const res = await call("PUT", "/credentials/openai", { value: GOOD_KEY });
+      expect(res.status).toBe(503);
+      expect(res.body.error).toMatch(/misconfigured.*URL-encoded/);
+      expect(JSON.stringify(res.body)).not.toMatch(/pass-secret|my@pass/);
+      expect((await call("POST", "/generate", { ...brief, apiKey: GOOD_KEY })).status).toBe(200);
+    }), 40000);
+
   it("says so, without details, when the database can't be reached, and typed keys still work", () =>
     withEnv({ ...dbEnv, DATABASE_URL: "postgres://nobody:secret-pw@127.0.0.1:1/none?sslmode=disable" }, async () => {
       const res = await call("PUT", "/credentials/openai", { value: GOOD_KEY });

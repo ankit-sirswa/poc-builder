@@ -1,5 +1,5 @@
 prototype
 tests
 .data
-.env
-.env.local
+.env*
+.vercel

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "./config";
-import { db } from "./db";
+import { DatabaseConfigError, db } from "./db";
 import { UserFacingError } from "./generate";
 
 /**
@@ -131,6 +131,10 @@ async function withDb<T>(fn: (pool: Awaited<ReturnType<typeof db>>) => Promise<T
     return await fn(await db());
   } catch (error) {
     if (error instanceof UserFacingError) throw error;
+    if (error instanceof DatabaseConfigError) {
+      console.error("Database misconfigured:", error.message);
+      throw new UserFacingError(`The database connection is misconfigured: ${error.message}`, 503);
+    }
     console.error("Postgres error:", (error as { code?: string; name?: string })?.code ?? (error as Error)?.name);
     throw new UserFacingError("The database isn't reachable right now. Your typed keys still work; saving keys needs it. Please retry.", 503);
   }

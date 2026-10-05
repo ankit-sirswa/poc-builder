@@ -6,7 +6,7 @@ import { config } from "./config";
  * and sized for serverless: one connection per function instance, short idle timeout.
  */
 
-const SCHEMA = `
+export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS credentials (
   owner     text        NOT NULL,
   provider  text        NOT NULL,
@@ -16,11 +16,40 @@ CREATE TABLE IF NOT EXISTS credentials (
   last4     text        NOT NULL,
   saved_at  timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (owner, provider)
-);`;
+);
+
+-- Supabase (and similar) publish the public schema through a web API usable with a public "anon" key.
+-- Lock the table down so only the server's own database connection can touch it: row-level security
+-- with no policies denies those roles, and the explicit REVOKE is a second layer. Harmless elsewhere:
+-- the table's owner (our connection) bypasses RLS, and the roles are only revoked if they exist.
+ALTER TABLE credentials ENABLE ROW LEVEL SECURITY;
+DO $$
+DECLARE r text;
+BEGIN
+  FOREACH r IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+      EXECUTE format('REVOKE ALL ON TABLE credentials FROM %I', r);
+    END IF;
+  END LOOP;
+END $$;`;
+
+/** A DATABASE_URL problem the operator can fix. The message never contains the URL (it holds the password). */
+export class DatabaseConfigError extends Error {}
 
 /** Splits sslmode out of the URL: node-postgres would otherwise decide TLS behaviour from it, ignoring our CA. */
-function connectionOptions(url: string) {
-  const parsed = new URL(url);
+export function connectionOptions(url: string) {
+  // An unencoded "@" in the password splits the URL in the wrong place and the "host" comes out wrong.
+  const authority = url.replace(/^[a-z]+:\/\//i, "").split("/")[0];
+  const hint = "If the password contains characters like @ # / ? : % it must be URL-encoded (or reset it to letters and digits).";
+  if ((authority.match(/@/g) ?? []).length > 1) throw new DatabaseConfigError(`DATABASE_URL has more than one "@" before the host. ${hint}`);
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new DatabaseConfigError(`DATABASE_URL isn't a valid URL. ${hint}`);
+  }
+  if (!/^postgres(ql)?:$/.test(parsed.protocol)) throw new DatabaseConfigError("DATABASE_URL must start with postgres:// or postgresql://.");
+  if (!parsed.hostname) throw new DatabaseConfigError(`DATABASE_URL has no host. ${hint}`);
   const sslmode = parsed.searchParams.get("sslmode");
   parsed.searchParams.delete("sslmode");
   const local = ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
